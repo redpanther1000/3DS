@@ -50,10 +50,10 @@ body.playing *{animation:none!important;transition:none!important}
 <main><div class="bar"><h2 id="title">All games</h2>
 <select id="sort"><option value="az">Name A-Z</option><option value="recent">Recently played</option><option value="size">Size</option></select>
 <button id="view">List view</button></div><div id="items"></div>
-<p class="note">Accepts decrypted .3ds, .cci and .cxi, plus .7z and .zip archives holding one of those. Games stay on this computer and are never uploaded. Your list lasts until you reload; favorites and play history are remembered. Save in-game, and use the emulator toolbar for save states.</p></main>
+<p class="note">Accepts decrypted .3ds, .cci and .cxi, plus .7z and .zip archives holding one of those. Games stay on this computer and are never uploaded. Very large games (about 2 GB or more) may not fit in a browser. Your list lasts until you reload; favorites and play history are remembered. Save in-game, and use the emulator toolbar for save states.</p></main>
 <section id="player"><div class="pbar"><button id="back">Library</button><strong id="pname"></strong><span class="sp"></span>
 <span class="hud" id="hud"></span>
-<label class="hud">Emulator version <select id="ver"><option value="auto">Auto</option><option value="latest">latest</option><option value="nightly">nightly</option><option value="stable">stable</option></select></label>
+<label class="hud">Emulator version <select id="ver"><option value="auto">Auto (finds the Azahar core)</option><option value="nightly">nightly</option><option value="latest">latest</option><option value="stable">stable</option></select></label>
 <button id="retry">Restart</button><button id="dbtn">Diagnostics</button>
 <label class="hud"><input id="autopause" type="checkbox" checked> Pause when tab hidden</label><button id="full">Fullscreen</button></div>
 <div id="diag"><button id="dclose">Close</button> <button id="dcopy">Copy for support</button><pre id="dtxt"></pre></div>
@@ -130,20 +130,28 @@ function render(){
 }
 let frame=null,raf=0,hudTimer=0,watch=0,blobUrl=null;
 async function pickBase(){
- const v=$('ver').value,order=v==='auto'?['latest','nightly','stable']:[v];
+ const v=$('ver').value,order=v==='auto'?['nightly','latest','stable']:[v];
  for(const k of order){
   const base=CDN+k+'/data/';
-  try{const r=await fetch(base+'loader.js',{cache:'no-store'});log('Check '+k+': loader.js HTTP '+r.status);if(r.ok)return base}catch(e){log('Check '+k+': loader.js failed ('+e.message+')')}
+  try{
+   const a=await fetch(base+'loader.js',{cache:'no-store'});
+   const c=await fetch(base+'cores/reports/azahar.json',{cache:'no-store'});
+   log('Check '+k+': loader.js HTTP '+a.status+', Azahar core report HTTP '+c.status);
+   if(a.ok&&c.ok)return base;
+  }catch(e){log('Check '+k+': failed ('+e.message+')')}
  }
- return CDN+'latest/data/';
+ return null;
 }
 async function play(g){
  if(g.r.status!=='ok'){alert(g.name+': '+g.r.msg);return}
  if(!window.crossOriginIsolated){alert('Threads are not on yet. Open this page from its web link (not the file on disk) and refresh once.');return}
+ if(g.size>2147483648&&!confirm('This game is '+fmt(g.size)+'. Files over about 2 GB often fail in a browser. Try anyway?'))return;
  cur=g;diag=[];m(g).last=Date.now();save();
  log('Game: '+g.name+' ('+g.size+' bytes), cross-origin isolated: '+window.crossOriginIsolated+', threads: '+navigator.hardwareConcurrency);
  document.body.classList.add('playing');$('pname').textContent=clean(g.name);
- const base=await pickBase();log('Using emulator files from: '+base);
+ const base=await pickBase();
+ if(!base){log('No emulator version on the CDN has the Azahar (3DS) core. The browser version cannot run 3DS right now. Use the native Azahar app.');$('diag').style.display='block';return}
+ log('Using emulator files from: '+base);
  if(blobUrl)URL.revokeObjectURL(blobUrl);blobUrl=URL.createObjectURL(g.file);
  frame=document.createElement('iframe');frame.allow='fullscreen; gamepad; autoplay; cross-origin-isolated';frame.src='player.html';
  frame.onload=()=>{const w=frame.contentWindow,d=frame.contentDocument;let started=false;
@@ -157,14 +165,14 @@ async function play(g){
   w.EJS_cacheConfig={enabled:true,cacheMaxSizeMB:4096,cacheMaxAgeMins:7200};
   w.EJS_onGameStart=()=>{started=true;log('Game started')};
   const s=d.createElement('script');s.src=base+'loader.js';s.crossOrigin='anonymous';
-  s.onerror=()=>{log('LOADER SCRIPT FAILED '+s.src);d.body.innerHTML='<p style="color:#fff;padding:24px;font:15px sans-serif">Could not load the emulator from the internet. Open Diagnostics.</p>';$('diag').style.display='block'};
+  s.onerror=()=>{log('LOADER SCRIPT FAILED '+s.src);$('diag').style.display='block'};
   d.body.appendChild(s);
   clearTimeout(watch);watch=setTimeout(()=>{if(!started){log('Not started after 25 s');$('diag').style.display='block'}},25000)};
  $('host').appendChild(frame);startHud();
 }
 function stop(){cancelAnimationFrame(raf);clearInterval(hudTimer);clearTimeout(watch);if(frame){frame.remove();frame=null}document.body.classList.remove('playing');$('diag').style.display='none';$('hud').textContent='';render()}
 $('back').onclick=()=>{if(confirm('Leave the game? Save in-game first.'))stop()};
-$('retry').onclick=()=>{const g=cur;stop();if(g)play(g)};
+$('retry').onclick=()=>{const g=cur,v=$('ver').value;stop();if(g){$('ver').value=v;play(g)}};
 $('dbtn').onclick=()=>{$('diag').style.display=$('diag').style.display==='block'?'none':'block'};
 $('dclose').onclick=()=>{$('diag').style.display='none'};
 $('dcopy').onclick=()=>navigator.clipboard.writeText(diag.join('\n'));

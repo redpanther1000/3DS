@@ -1,0 +1,177 @@
+<!DOCTYPE html><html lang="en" data-theme="dark"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Game Station 3DS</title>
+<script src="coi-serviceworker.js"></script>
+<style>
+:root{--bg:#0d1017;--panel:#151a23;--card:#1b212c;--line:#283040;--fg:#eaf0f8;--mut:#8d9bb0;--acc:#27b3ff;--acc2:#7c5cff;--r:14px}
+[data-theme=light]{--bg:#f3f5f9;--panel:#fff;--card:#fff;--line:#dde3ec;--fg:#121826;--mut:#5d6b80;--acc:#0a84e0;--acc2:#6a4be8}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg);display:grid;grid-template-columns:220px 1fr;grid-template-rows:56px 1fr}
+header{grid-column:1/3;display:flex;align-items:center;gap:12px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--line)}
+.logo{font-weight:700}.logo b{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;color:transparent}
+.ed{font-size:11px;color:var(--mut);border:1px solid var(--line);padding:1px 7px;border-radius:99px}header .sp{flex:1}
+input[type=search]{background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:7px 12px;width:240px;font:inherit}
+button,label.btn,select{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:7px 13px;font:inherit;cursor:pointer}
+button:hover,label.btn:hover{border-color:var(--acc)}.pri{background:linear-gradient(90deg,var(--acc),var(--acc2));border:0;color:#fff;font-weight:600}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:14px 10px;overflow:auto}
+aside h3{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin:14px 8px 6px}
+.nav{display:flex;justify-content:space-between;width:100%;text-align:left;background:none;border:0;border-radius:9px;padding:8px 10px;color:var(--fg)}
+.nav.on{background:var(--card);box-shadow:inset 3px 0 0 var(--acc)}.nav span{color:var(--mut)}
+main{padding:18px 22px;overflow:auto}
+.bar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}.bar h2{margin:0;flex:1;font-size:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px}.list{display:flex;flex-direction:column;gap:8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;cursor:pointer;position:relative}
+.card:hover{border-color:var(--acc);transform:translateY(-2px)}
+.cover{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:800;color:#fff;text-shadow:0 2px 10px #0006}
+.meta{padding:10px 12px}.t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.s{color:var(--mut);font-size:12px}
+.list .card{display:flex;align-items:center}.list .cover{width:56px;aspect-ratio:1;font-size:22px;flex:none}.list .meta{flex:1}
+.fav{position:absolute;top:8px;right:8px;background:#0008;color:#fff;border:0;border-radius:99px;width:30px;height:30px;padding:0;font-size:15px}
+.fav.on{color:#ffcf40}.list .fav{position:static;margin-right:12px;background:none;color:var(--mut)}
+.badge{display:inline-block;font-size:11px;padding:1px 8px;border-radius:99px;border:1px solid var(--line);margin-top:3px}
+.ok{color:#3ddc84}.warn{color:#ffb020}.bad{color:#ff6b6b}
+.empty{text-align:center;color:var(--mut);padding:70px 20px;border:2px dashed var(--line);border-radius:var(--r)}
+#player{display:none;grid-column:1/3;grid-row:2;flex-direction:column;background:#000;position:relative}
+body.playing #player{display:flex}body.playing aside,body.playing main{display:none}
+.pbar{display:flex;gap:10px;align-items:center;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.pbar .sp{flex:1}.hud{font-variant-numeric:tabular-nums;color:var(--mut);font-size:12px}
+iframe{flex:1;border:0;width:100%;background:#000}
+#diag{display:none;position:absolute;inset:50px 14px 14px 14px;background:#0b0e13f2;border:1px solid var(--line);border-radius:12px;padding:14px;color:#cfe;overflow:auto;z-index:5}
+#diag pre{white-space:pre-wrap;font:12px/1.5 ui-monospace,Menlo,monospace;margin:8px 0}
+.note{color:var(--mut);font-size:12px;margin-top:20px;max-width:760px}.sys{margin:10px 8px;font-size:12px;line-height:1.7}
+body.playing *{animation:none!important;transition:none!important}
+</style></head><body>
+<header><div class="logo">Game Station <b>3DS</b></div><span class="ed">Performance Edition</span><div class="sp"></div>
+<input id="q" type="search" placeholder="Search games"><label class="btn pri">Add games<input id="add" type="file" accept=".3ds,.cci,.cxi,.cia,.zip,.7z,.rar" multiple hidden></label>
+<button id="theme">Light mode</button></header>
+<aside><h3>Library</h3>
+<button class="nav on" data-v="all">All games <span id="c-all">0</span></button>
+<button class="nav" data-v="fav">Favorites <span id="c-fav">0</span></button>
+<button class="nav" data-v="recent">Recently played <span id="c-rec">0</span></button>
+<h3>System check</h3><div class="sys" id="sys"></div></aside>
+<main><div class="bar"><h2 id="title">All games</h2>
+<select id="sort"><option value="az">Name A-Z</option><option value="recent">Recently played</option><option value="size">Size</option></select>
+<button id="view">List view</button></div><div id="items"></div>
+<p class="note">Accepts decrypted .3ds, .cci and .cxi, plus .7z and .zip archives holding one of those. Games stay on this computer and are never uploaded. Your list lasts until you reload; favorites and play history are remembered. Save in-game, and use the emulator toolbar for save states.</p></main>
+<section id="player"><div class="pbar"><button id="back">Library</button><strong id="pname"></strong><span class="sp"></span>
+<span class="hud" id="hud"></span>
+<label class="hud">Emulator version <select id="ver"><option value="auto">Auto</option><option value="latest">latest</option><option value="nightly">nightly</option><option value="stable">stable</option></select></label>
+<button id="retry">Restart</button><button id="dbtn">Diagnostics</button>
+<label class="hud"><input id="autopause" type="checkbox" checked> Pause when tab hidden</label><button id="full">Fullscreen</button></div>
+<div id="diag"><button id="dclose">Close</button> <button id="dcopy">Copy for support</button><pre id="dtxt"></pre></div>
+<div id="host" style="flex:1;display:flex"></div></section>
+<script>
+
+async function inspect3ds(file){
+ const name=file.name, ext=(name.includes('.')?name.split('.').pop():'').toLowerCase();
+ const r={name,size:file.size,ext,kind:'Unknown',status:'bad',msg:'Unrecognized file type.',tid:''};
+ const hex8=(dv,o)=>dv.getBigUint64(o,true).toString(16).toUpperCase().padStart(16,'0');
+ if(['7z','zip'].includes(ext)){r.kind='Archive (.'+ext+')';r.status='ok';r.msg='Will be unpacked by the emulator. It must contain one decrypted .3ds, .cci or .cxi.';return r}
+ if(ext==='rar'){r.kind='Archive';r.status='warn';r.msg='.rar is not supported. Re-pack as .7z or .zip, or extract it.';return r}
+ if(ext==='cia'){r.kind='CIA';r.status='warn';r.msg='.cia cannot run in the browser. Install it in the native Azahar app.';return r}
+ if(!['3ds','cci','cxi'].includes(ext))return r;
+ try{
+  if(file.size<0x200){r.msg='Too small to be a 3DS game.';return r}
+  const head=new DataView(await file.slice(0,0x200).arrayBuffer());
+  const mg=(dv,o)=>String.fromCharCode(dv.getUint8(o),dv.getUint8(o+1),dv.getUint8(o+2),dv.getUint8(o+3));
+  let ncch=null;
+  if(mg(head,0x100)==='NCSD'){r.kind='Cartridge';r.tid=hex8(head,0x108);
+   const off=head.getUint32(0x120,true)*0x200;
+   if(off+0x200>file.size){r.msg='File looks cut off. Re-copy it.';return r}
+   ncch=new DataView(await file.slice(off,off+0x200).arrayBuffer());
+  }else if(mg(head,0x100)==='NCCH'){r.kind='Executable';ncch=head}
+  else{r.msg='Header not recognized: encrypted, damaged or not a 3DS game.';return r}
+  if(mg(ncch,0x100)!=='NCCH'){r.msg='Game data unreadable: likely encrypted or damaged.';return r}
+  if(!r.tid)r.tid=hex8(ncch,0x118);
+  if((ncch.getUint8(0x18F)&4)!==0){r.status='ok';r.msg='Decrypted and ready.'}
+  else{r.status='bad';r.msg='Looks encrypted. Needs a decrypted dump from your own console.'}
+  return r;
+ }catch(e){r.msg='Could not read the file.';return r}
+}
+
+const $=id=>document.getElementById(id),LS='gs3ds.meta.v1',CDN='https://cdn.emulatorjs.org/';
+let lib=[],view='all',mode='grid',meta={},cur=null,diag=[];try{meta=JSON.parse(localStorage.getItem(LS)||'{}')}catch(e){}
+const save=()=>{try{localStorage.setItem(LS,JSON.stringify(meta))}catch(e){}};
+const key=g=>g.name+'|'+g.size,esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=n=>n>1e9?(n/1e9).toFixed(2)+' GB':n>1e6?(n/1e6).toFixed(0)+' MB':Math.max(1,Math.round(n/1e3))+' KB';
+const clean=n=>n.replace(/\.[^.]+$/,'').replace(/[_]+/g,' ');
+function hue(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))%360;return h}
+const m=g=>meta[key(g)]||(meta[key(g)]={fav:false,last:0});
+const log=t=>{diag.push(new Date().toLocaleTimeString()+'  '+t);$('dtxt').textContent=diag.join('\n')};
+$('theme').onclick=()=>{const l=document.documentElement.dataset.theme!=='light';document.documentElement.dataset.theme=l?'light':'dark';$('theme').textContent=l?'Dark mode':'Light mode'};
+(function sys(){const s=$('sys'),L=[];
+ if(location.protocol==='file:')L.push(['bad','Opened from disk: 3DS cannot start. Open the web link instead.']);
+ else if(window.crossOriginIsolated)L.push(['ok','Threads on']);
+ else L.push(['warn','Setting up... the page reloads once. If this stays, refresh.']);
+ L.push(document.createElement('canvas').getContext('webgl2')?['ok','WebGL 2 available']:['bad','No WebGL 2']);
+ if(navigator.hardwareConcurrency)L.push([navigator.hardwareConcurrency>=6?'ok':'warn','CPU threads: '+navigator.hardwareConcurrency]);
+ s.innerHTML=L.map(x=>'<div class="'+x[0]+'">'+esc(x[1])+'</div>').join('')})();
+async function addFiles(files){for(const f of files){if(lib.some(g=>key(g)===f.name+'|'+f.size))continue;const r=await inspect3ds(f);lib.push({file:f,name:f.name,size:f.size,r})}render()}
+$('add').onchange=e=>{addFiles([...e.target.files]);e.target.value=''};
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',e=>{e.preventDefault();addFiles([...e.dataTransfer.files])});
+document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{view=b.dataset.v;document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('on',x===b));render()});
+$('q').oninput=render;$('sort').onchange=render;
+$('view').onclick=()=>{mode=mode==='grid'?'list':'grid';$('view').textContent=mode==='grid'?'List view':'Grid view';render()};
+function render(){
+ const q=$('q').value.toLowerCase();let a=lib.filter(g=>clean(g.name).toLowerCase().includes(q));
+ $('c-all').textContent=lib.length;$('c-fav').textContent=lib.filter(g=>m(g).fav).length;$('c-rec').textContent=lib.filter(g=>m(g).last).length;
+ if(view==='fav')a=a.filter(g=>m(g).fav);if(view==='recent')a=a.filter(g=>m(g).last);
+ const s=$('sort').value;a.sort((x,y)=>s==='az'?clean(x.name).localeCompare(clean(y.name)):s==='size'?y.size-x.size:m(y).last-m(x).last);
+ $('title').textContent={all:'All games',fav:'Favorites',recent:'Recently played'}[view];
+ const it=$('items');
+ if(!a.length){it.className='';it.innerHTML='<div class="empty"><p style="font-size:18px;color:var(--fg)">'+(lib.length?'Nothing here yet':'A home for your 3DS games')+'</p><p>'+(lib.length?'Try another view or search.':'Click Add games or drop files anywhere.')+'</p></div>';return}
+ it.className=mode==='grid'?'grid':'list';
+ it.innerHTML=a.map(g=>{const id=lib.indexOf(g),h=hue(g.name);
+  return '<div class="card" data-i="'+id+'"><div class="cover" style="background:linear-gradient(135deg,hsl('+h+',65%,48%),hsl('+((h+50)%360)+',70%,35%))">'+esc(clean(g.name).trim().slice(0,2).toUpperCase())+'</div>'+
+  '<div class="meta"><div class="t">'+esc(clean(g.name))+'</div><div class="s">'+esc(g.r.ext.toUpperCase())+' - '+fmt(g.size)+(g.r.tid?' - '+g.r.tid:'')+'</div><span class="badge '+g.r.status+'">'+esc(g.r.status==='ok'?(g.r.tid?'Ready':'Archive'):g.r.status==='warn'?'Needs a step':'Problem')+'</span></div>'+
+  '<button class="fav'+(m(g).fav?' on':'')+'" data-f="'+id+'">'+(m(g).fav?'\u2605':'\u2606')+'</button></div>'}).join('');
+ it.querySelectorAll('.card').forEach(c=>c.onclick=e=>{
+  if(e.target.dataset.f!==undefined){const g=lib[+e.target.dataset.f];m(g).fav=!m(g).fav;save();render();e.stopPropagation();return}
+  play(lib[+c.dataset.i])});
+}
+let frame=null,raf=0,hudTimer=0,watch=0,blobUrl=null;
+async function pickBase(){
+ const v=$('ver').value,order=v==='auto'?['latest','nightly','stable']:[v];
+ for(const k of order){
+  const base=CDN+k+'/data/';
+  try{const r=await fetch(base+'loader.js',{cache:'no-store'});log('Check '+k+': loader.js HTTP '+r.status);if(r.ok)return base}catch(e){log('Check '+k+': loader.js failed ('+e.message+')')}
+ }
+ return CDN+'latest/data/';
+}
+async function play(g){
+ if(g.r.status!=='ok'){alert(g.name+': '+g.r.msg);return}
+ if(!window.crossOriginIsolated){alert('Threads are not on yet. Open this page from its web link (not the file on disk) and refresh once.');return}
+ cur=g;diag=[];m(g).last=Date.now();save();
+ log('Game: '+g.name+' ('+g.size+' bytes), cross-origin isolated: '+window.crossOriginIsolated+', threads: '+navigator.hardwareConcurrency);
+ document.body.classList.add('playing');$('pname').textContent=clean(g.name);
+ const base=await pickBase();log('Using emulator files from: '+base);
+ if(blobUrl)URL.revokeObjectURL(blobUrl);blobUrl=URL.createObjectURL(g.file);
+ frame=document.createElement('iframe');frame.allow='fullscreen; gamepad; autoplay; cross-origin-isolated';frame.src='player.html';
+ frame.onload=()=>{const w=frame.contentWindow,d=frame.contentDocument;let started=false;
+  const of=w.fetch.bind(w);w.fetch=(...a)=>of(...a).then(r=>{if(!r.ok)log('FETCH '+r.status+' '+(a[0].url||a[0]));return r}).catch(e=>{log('FETCH FAILED '+(a[0].url||a[0])+' - '+e.message);throw e});
+  const xo=w.XMLHttpRequest.prototype.open;w.XMLHttpRequest.prototype.open=function(mt,u){this.addEventListener('error',()=>log('XHR FAILED '+u));this.addEventListener('load',()=>{if(this.status>=400)log('XHR '+this.status+' '+u)});return xo.apply(this,arguments)};
+  w.addEventListener('error',e=>log('ERROR '+e.message+(e.filename?' @ '+e.filename:'')));
+  w.addEventListener('unhandledrejection',e=>log('REJECTED '+(e.reason&&e.reason.message||e.reason)));
+  w.EJS_player='#game';w.EJS_core='3ds';w.EJS_gameUrl=blobUrl;w.EJS_gameName=g.name;
+  w.EJS_pathtodata=base;w.EJS_threads=true;w.EJS_volume=0.6;w.EJS_color='#27b3ff';
+  w.EJS_backgroundColor='#000';w.EJS_startOnLoaded=true;w.EJS_askBeforeExit=false;
+  w.EJS_cacheConfig={enabled:true,cacheMaxSizeMB:4096,cacheMaxAgeMins:7200};
+  w.EJS_onGameStart=()=>{started=true;log('Game started')};
+  const s=d.createElement('script');s.src=base+'loader.js';s.crossOrigin='anonymous';
+  s.onerror=()=>{log('LOADER SCRIPT FAILED '+s.src);d.body.innerHTML='<p style="color:#fff;padding:24px;font:15px sans-serif">Could not load the emulator from the internet. Open Diagnostics.</p>';$('diag').style.display='block'};
+  d.body.appendChild(s);
+  clearTimeout(watch);watch=setTimeout(()=>{if(!started){log('Not started after 25 s');$('diag').style.display='block'}},25000)};
+ $('host').appendChild(frame);startHud();
+}
+function stop(){cancelAnimationFrame(raf);clearInterval(hudTimer);clearTimeout(watch);if(frame){frame.remove();frame=null}document.body.classList.remove('playing');$('diag').style.display='none';$('hud').textContent='';render()}
+$('back').onclick=()=>{if(confirm('Leave the game? Save in-game first.'))stop()};
+$('retry').onclick=()=>{const g=cur;stop();if(g)play(g)};
+$('dbtn').onclick=()=>{$('diag').style.display=$('diag').style.display==='block'?'none':'block'};
+$('dclose').onclick=()=>{$('diag').style.display='none'};
+$('dcopy').onclick=()=>navigator.clipboard.writeText(diag.join('\n'));
+$('full').onclick=()=>{if(frame)frame.requestFullscreen&&frame.requestFullscreen()};
+function startHud(){let n=0,t=performance.now();const tick=()=>{n++;raf=requestAnimationFrame(tick)};raf=requestAnimationFrame(tick);
+ hudTimer=setInterval(()=>{const now=performance.now();$('hud').textContent='Display '+Math.round(n*1000/(now-t))+' fps';n=0;t=now},1000)}
+document.addEventListener('visibilitychange',()=>{if(!frame||!$('autopause').checked)return;
+ try{const e=frame.contentWindow.EJS_emulator;if(e){document.hidden?e.pause&&e.pause():e.play&&e.play()}}catch(x){}});
+render();
+</script></body></html>
